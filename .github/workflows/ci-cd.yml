@@ -1,0 +1,79 @@
+name: NutriRed CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Pruebas y Cobertura
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Ejecutar pruebas con cobertura
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET || 'ci_test_secret' }}
+          NODE_ENV: test
+        run: npm test
+
+      - name: Verificar umbral de cobertura (≥80%)
+        run: |
+          node -e "
+            const c = require('./coverage/coverage-summary.json').total;
+            const min = 80;
+            const fails = [];
+            ['lines','statements','functions','branches'].forEach(k => {
+              if (c[k].pct < min) fails.push(k + ': ' + c[k].pct + '%');
+            });
+            if (fails.length) { console.error('❌ Cobertura insuficiente:', fails); process.exit(1); }
+            console.log('✅ Cobertura OK');
+          "
+
+      - name: Subir reporte de cobertura
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+
+  deploy-staging:
+    name: Despliegue en Entorno de Prueba
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias de producción
+        run: npm ci --omit=dev
+
+      - name: Desplegar en entorno de prueba (ejemplo con Render)
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -n "$DEPLOY_HOOK" ]; then
+            curl -X POST "$DEPLOY_HOOK"
+            echo "✅ Despliegue disparado en entorno de staging"
+          else
+            echo "⚠️  DEPLOY_HOOK no configurado, omitiendo despliegue"
+          fi
