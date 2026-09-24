@@ -24,26 +24,22 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      - name: Cache MongoDB binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: ${{ runner.os }}-mongodb-7.0
+
+      # El gate de cobertura lo hace Jest automáticamente (coverageThreshold en jest.config.js)
       - name: Ejecutar pruebas con cobertura
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET || 'ci_test_secret' }}
+          JWT_EXPIRES_IN: '1h'
           NODE_ENV: test
         run: npm test
 
-      - name: Verificar umbral de cobertura (≥80%)
-        run: |
-          node -e "
-            const c = require('./coverage/coverage-summary.json').total;
-            const min = 80;
-            const fails = [];
-            ['lines','statements','functions','branches'].forEach(k => {
-              if (c[k].pct < min) fails.push(k + ': ' + c[k].pct + '%');
-            });
-            if (fails.length) { console.error('❌ Cobertura insuficiente:', fails); process.exit(1); }
-            console.log('✅ Cobertura OK');
-          "
-
       - name: Subir reporte de cobertura
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
@@ -67,13 +63,13 @@ jobs:
       - name: Instalar dependencias de producción
         run: npm ci --omit=dev
 
-      - name: Desplegar en entorno de prueba (ejemplo con Render)
+      - name: Despliegue (opcional)
         env:
           DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
           if [ -n "$DEPLOY_HOOK" ]; then
             curl -X POST "$DEPLOY_HOOK"
-            echo "✅ Despliegue disparado en entorno de staging"
+            echo "✅ Despliegue disparado"
           else
-            echo "⚠️  DEPLOY_HOOK no configurado, omitiendo despliegue"
+            echo "⚠️  DEPLOY_HOOK no configurado, saltando despliegue"
           fi
