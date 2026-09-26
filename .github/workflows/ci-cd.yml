@@ -37,7 +37,8 @@ jobs:
           JWT_EXPIRES_IN: '1h'
           NODE_ENV: test
         run: npm test
-            - name: Descargar historial completo (para Sonar)
+        
+      - name: Descargar historial completo (para Sonar)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
