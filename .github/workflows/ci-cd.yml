@@ -37,7 +37,16 @@ jobs:
           JWT_EXPIRES_IN: '1h'
           NODE_ENV: test
         run: npm test
+            - name: Descargar historial completo (para Sonar)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       - name: Subir reporte de cobertura
         if: always()
         uses: actions/upload-artifact@v4
